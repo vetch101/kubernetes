@@ -179,7 +179,15 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(requestUrl *url.URL, proxyURL *ur
 	targetHost := netutil.CanonicalAddr(requestUrl)
 	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
 
-	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, nil, proxy.Direct)
+	var auth *proxy.Auth
+	if proxyURL.User != nil {
+		pass, _ := proxyURL.User.Password()
+		auth = &proxy.Auth{
+			User:     proxyURL.User.Username(),
+			Password: pass,
+		}
+	}
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, proxy.Direct)
 
 	if err != nil {
 		return nil, err
