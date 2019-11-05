@@ -132,7 +132,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 
 	switch proxyURL.Scheme {
 	case "socks5":
-		return s.dialWithSocks5Proxy(req.URL, proxyURL)
+		return s.dialWithSocks5Proxy(req, proxyURL)
 	case "https", "http":
 		return s.dialWithHttpProxy(req, proxyURL)
 	}
@@ -176,9 +176,9 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 }
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
-func (s *SpdyRoundTripper) dialWithSocks5Proxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
+func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
-	targetHost := netutil.CanonicalAddr(requestUrl)
+	targetHost := netutil.CanonicalAddr(req.URL)
 	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
 
 	var auth *proxy.Auth
@@ -205,7 +205,7 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(requestUrl *url.URL, proxyURL *ur
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(requestUrl, rwc, targetHost)
+	return s.tlsConn(req.URL, rwc, targetHost)
 }
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
