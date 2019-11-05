@@ -134,26 +134,28 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	case "socks5":
 		return s.dialWithSocks5Proxy(req.URL, proxyURL)
 	case "https", "http":
-		return s.dialWithHttpProxy(req.URL, proxyURL)
+		return s.dialWithHttpProxy(req, proxyURL)
 	}
 
 	return nil, fmt.Errorf("proxy URL scheme not supported: %s", proxyURL.Scheme)
 }
 
 // dialWithHttpProxy dials the host specified by url through an http or an https proxy.
-func (s *SpdyRoundTripper) dialWithHttpProxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
+func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
-	targetHost := netutil.CanonicalAddr(requestUrl)
+	targetHost := netutil.CanonicalAddr(req.URL)
 
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
 	proxyReq := http.Request{
 		Method: "CONNECT",
-		URL:    &url.URL{},
-		Host:   targetHost,
+		URL: &url.URL{},
+		Header: http.Header{},
+		Host: targetHost,
 	}
 
+	proxyReq.WithContext(req.Context())
+
 	if pa := s.proxyAuth(proxyURL); pa != "" {
-		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
@@ -170,7 +172,7 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(requestUrl *url.URL, proxyURL *url.
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(requestUrl, rwc, targetHost)
+	return s.tlsConn(req.URL, rwc, targetHost)
 }
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
