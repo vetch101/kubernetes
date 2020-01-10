@@ -148,9 +148,9 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
 	proxyReq := http.Request{
 		Method: "CONNECT",
-		URL: &url.URL{},
+		URL:    &url.URL{},
 		Header: http.Header{},
-		Host: targetHost,
+		Host:   targetHost,
 	}
 
 	proxyReq.WithContext(req.Context())
