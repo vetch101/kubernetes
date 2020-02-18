@@ -132,16 +132,16 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 
 	switch proxyURL.Scheme {
 	case "socks5":
-		return s.dialWithSocks5Proxy(req, proxyURL)
+		return s.dialWithSocks5Proxy(req.URL, proxyURL)
 	case "https", "http":
-		return s.dialWithHttpProxy(req, proxyURL)
+		return s.dialWithHttpProxy(req.URL, proxyURL)
 	}
 
 	return nil, fmt.Errorf("proxy URL scheme not supported: %s", proxyURL.Scheme)
 }
 
-// dialWithHttpProxy dials the host specified by url through an http or an https proxy.
-func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
+// dialWithoutProxy dials the host specified by url through an http or an https proxy.
+func (s *SpdyRoundTripper) dialWithHttpProxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
 	targetHost := netutil.CanonicalAddr(req.URL)
 
@@ -175,37 +175,25 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	return s.tlsConn(req.URL, rwc, targetHost)
 }
 
-// dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
-func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
+// dialWithoutProxy dials the host specified by url through a socks5 proxy.
+func (s *SpdyRoundTripper) dialWithSocks5Proxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
-	targetHost := netutil.CanonicalAddr(req.URL)
+	targetHost := netutil.CanonicalAddr(requestUrl)
+
 	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, nil, proxy.Direct)
 
-	var auth *proxy.Auth
-	if proxyURL.User != nil {
-		pass, _ := proxyURL.User.Password()
-		auth = &proxy.Auth{
-			User:     proxyURL.User.Username(),
-			Password: pass,
-		}
-	}
-	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, proxy.Direct)
+	proxyConn, err := proxyDialer.Dial("tcp", targetHost)
 
 	if err != nil {
 		return nil, err
 	}
 
-	proxyDialConn, err := proxyDialer.Dial("tcp", targetHost)
-
-	if err != nil {
-		return nil, err
-	}
-
-	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+	proxyClientConn := httputil.NewProxyClientConn(proxyConn, nil)
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(req.URL, rwc, targetHost)
+	return s.tlsConn(requestUrl, rwc, targetHost)
 }
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
